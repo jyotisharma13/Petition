@@ -1,0 +1,19 @@
+{{> header}}
+<h3>Sign our petition to make the wearing of crocs in public places a criminal act in every jurisdiction!</h3>
+{{#if error}}
+<div class name="error">Oops thats error!!! Try again </div>
+{{/if}}
+<form method="POST">
+        <p>
+            <div> First Name
+            <input name = "first" placeholder="FirstName">
+        </div>
+        <div> Last Name
+        <input name = "last" placeholder="LastName">
+        </div>
+        <input type = "hidden" name ="sign" placeholder="Signature"></p>
+        <!-- <canvas> </canvas> -->
+        <canvas id="canvas" width="490" height="120"></canvas>
+        <button> Submit </button>
+
+</form>
