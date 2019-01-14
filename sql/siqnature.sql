@@ -6,5 +6,4 @@ create table signatures (
     last varchar(200)not null,
     sign text not null,
     created_at timestamp default current_timestamp
-
 );
