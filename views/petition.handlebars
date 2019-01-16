@@ -4,10 +4,10 @@
     <ul>Smoking in public places affect the people near the somkers, especially the children.</ul>
 </P>
     <p>{{count}} persons have already signed the petition</p>
-    
+
 <img src ="smoke.jpg" width= "200px" height = "100px">
 {{#if error}}
-<div class name="error">Oops thats error!!! Try again </div>
+<div class name="error">SORRY! It seems like you did not enter your first and last name. Please let us know who you are.</div>
 {{/if}}
 <form method="POST">
 
@@ -17,8 +17,9 @@
         <div> Last Name
         <input name = "last" placeholder="LastName"autocomplete="off" autofocus>
         </div>
-        <input type = "hidden" name ="sign"autocomplete="off">
-        <!-- <canvas> </canvas> -->
+        <input id="sig-field" type = "hidden" name ="sign" autocomplete="off">
+        <input name ="_csrf" type="hidden" value="{{csrfToken}}">
+        <!-- // it return the token -->
         <canvas id="canvas" width="490" height="120"></canvas>
         <label for="signature" class="label">sign here</label>
         <button> Submit </button>

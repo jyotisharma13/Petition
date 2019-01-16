@@ -4,32 +4,118 @@ const ca = require('chalk-animation');
 var cookieSession = require('cookie-session');
 const cookieParser = require('cookie-parser');
 const app = express();
-const {cookieSecret} = require('./secrets');
+const bcrypt = require('./bcrypt.js');
+// const {cookieSecret} = require('./secrets');
+const csurf = require('csurf');
 const db= require('./db');
 const log = console.log;
 app.use(cookieParser());
+//tell express which template to use (handlebars)
 var petition = require('express-handlebars');
 app.engine('handlebars', petition());
 app.set('view engine', 'handlebars');
 app.use(bodyParser.urlencoded({extended:false}));
 app.use(express.static(__dirname + "/public"));
-
-
+const {requireSignature, requireNoSignature, requireLoggedOutUser} = require('./middleware.js');
+app.disable('x-powered-by');
+//middleware
+app.use(cookieParser());
 app.use(cookieSession({
     secret: `I'm always angery.`,
     maxAge: 1000 * 60 * 60 * 24 * 14
 }));
-// let private = (req, res, next) => {
-//     if(!req.session.id) {
-//         res.redirect('/error')
-//     } else {
-//         next()
-//     }
-// }
-app.get('/', (req, res) => {
-    res.redirect('/petition');
+app.use(csurf());// after body parser nd body token
+app.use((req, res, next)=>{
+    res.locals.csrfToken = req.csrfToken();
+    // res.locals.crsf= req.session.first;
+    res.setHeader('X-Frame-Options','DENY');
+    next();
 });
-app.get('/petition', (req, res) => {
+app.use(function(req, res, next){
+    if(!req.session.userId && req.url !='/register' && req.url != '/login'){
+        res.redirect('/register');
+    } else{
+        next();
+    }
+});
+//routes handler
+app.get('/', (req, res) => {
+    if(req.session.signId){
+        res.redirect('/thanks');
+    } else {
+        res.render('petition',{
+            layout:'main'
+        });
+    }
+});
+app.get('/login',requireLoggedOutUser, (req, res)=>{
+    res.render('login', {
+        layout: 'main'
+    });
+});
+
+app.post('/login', requireLoggedOutUser,(req, res)=>{
+    console.log('req.body:', req.body);
+    bcrypt
+        .hash(req.body.password)
+        .then(hashedPass => {
+            return db.loginUser(
+                req.body.email,
+                hashedPass
+            );
+        }).then(data => {
+            console.log('Data: ', data);
+            req.session.userId = data.rows[0].id;
+            console.log('User has been login!');
+            res.redirect('/petition');
+        })
+        .catch(err => {
+            console.log("login error",err);
+            res.render('login', {
+                layout: 'main',
+                error: true
+            });
+        });
+});
+
+app.get('/register',(req, res)=>{
+    res.render('register', {
+        layout: 'main'
+    });
+    // res.redirect('/petition');
+});
+
+app.post('/register',(req, res)=>{
+    console.log('req.body:', req.body);
+    bcrypt
+        .hash(req.body.password)
+        .then(hashedPass => {
+            return db.registerUser(
+                req.body.first,
+                req.body.last,
+                req.body.email,
+                hashedPass
+            );
+        }).then(data => {
+            console.log('Data: ', data);
+            req.session.userId = data.rows[0].id;
+            req.session.first = data.rows[0].first;
+            req.session.last = data.rows[0].last;
+            console.log('User has been registered!');
+            res.redirect('/petition');
+        })
+        .catch(err => {
+            console.log(err);
+            res.render('register', {
+                layout: 'main',
+                error: true
+            });
+        });
+});
+
+
+app.get('/petition', requireNoSignature, (req, res) => {
+    log('testing 1');
     db.getRowCount()
         .then(result => {
             res.render('petition', {
@@ -39,53 +125,76 @@ app.get('/petition', (req, res) => {
         });
 });
 
-app.post('/petition', (req, res)=>{
-    log(req.body.first);
+app.post('/petition', requireNoSignature, (req, res)=>{
+    log("1st:",req.body.first);
+    log("2nd:",req.body.last);
     log("req.body",req.body);
-    log(req.body.last);
-    const firstName = req.body.first;
-    const lastName = req.body.last;
+    const firstName = req.session.first;
+    const lastName = req.session.last;
     const signature = req.body.sign;
-    // if(firstName && lastName){
-    db.addUser(firstName,lastName, signature).then((result)=>{
-        // res.cookie("username",`${firstName} ${lastName}`);
-        console.log('added new entry in database');
-        req.session = {
-            id: result.rows[0].id,
-            name: `${result.rows[0].first} ${result.rows[0].last}`
-        };
-        res.redirect('/thanks');
-    // } else {
-    }).catch(err =>{
-        log(err.message);
-        res.render('petition', {
-            layout:"main",
-            error: true
+    const userId = req.session.userId;
+    db.addUser(firstName, lastName, signature, userId)
+        .then(data => {
+            console.log('Signer has been saved to DB');
+            req.session.sigid = data.rows[0].id;
+            // req.session = {
+            //     sigid: data.rows[0].id
+            //     // name: `${data.rows[0].first} ${data.rows[0].last}`
+            // };
+            // console.log('req.session name: ', req.session.name);
+            log("sigid:",req.session.sigid);
+            res.redirect('/thanks');
+        //     res.render('thanks', {
+        //         layout:'main'});
+        })
+        .catch(function(err) {
+            console.log('Error in addSign:', err);
+            res.render('petition', {
+                error: true,
+                layout: 'main'
+            });
         });
-
-    });
 });
 
-app.get('/signers', function(req, res){
+app.get('/signers', requireSignature, function(req, res){
     db.getSigners().then((signers)=>{
         log(signers.rows);
         res.render('signers', {
             layout:"main",
             signers:signers.rows
         });
-    });
+    })
+        .catch(err => log('Error in signers:', err));
 });
+// app.get('/signers/:city', requireSignature, function(req, res){
+//      const city = req.params.city;
+//     db.getSigners().then((signers)=>{
+//         log(signers.rows);
+//         res.render('signers', {
+//             layout:"main",
+//             signers:signers.rows
+//         });
+//     })
+//         .catch(err => log('Error in signers:', err));
+// });
 
-app.get('/thanks', function(req, res){
-    log(req.body);
-    db.getsignature(req.session.id).then((sign) => {
+app.get('/thanks', requireSignature, function(req, res){
+    log('testing 2');
+    log("req.session.sigid:",req.session.sigid);
+    Promise.all([db.getRowCount(),db.getSignature(req.session.userId)]).then(function([countResult, signResult]) {
+        console.log("signatures:",signResult);
+        log(countResult);
         log("req session in /thanks", req.session);
         res.render('thanks', {
             layout:"main",
-            name:`${sign.rows[0].first} ${sign.rows[0].last}`,
-            signature: sign.rows[0].signature
+            count: countResult.rows[0].count,
+            // // name:req.session.name,
+            // // name:`${signResult.rows[0].first} ${signResult.rows[0].last}`,
+            signature: signResult.rows[0].sign,
+            first: req.session.first
         });
-    });
+
+    }).catch(err => log('err in thanks', err));
 });
 
 app.get('/petition', function(req, res){
