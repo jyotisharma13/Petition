@@ -56,24 +56,51 @@ app.get('/login',requireLoggedOutUser, (req, res)=>{
 
 app.post('/login', requireLoggedOutUser,(req, res)=>{
     console.log('req.body:', req.body);
-    bcrypt
-        .hash(req.body.password)
-        .then(hashedPass => {
-            return db.loginUser(
-                req.body.email,
-                hashedPass
-            );
-        }).then(data => {
-            console.log('Data: ', data);
-            req.session.userId = data.rows[0].id;
-            console.log('User has been login!');
-            res.redirect('/petition');
-        })
-        .catch(err => {
-            console.log("login error",err);
+    let userId ='';
+    let name= '';
+    db.getLoginUser(
+        req.body.email
+    ).then(data => {
+        console.log('Data: ', data);
+        userId = data.rows[0].id;
+        log("userId:",userId);
+        name = `${data.rows[0]['first_name']} ${data.rows[0]['last_name']}`;
+        log("name:",name);
+        // return checkPassword(req.body.password, data.rows[0].password)
+        // console.log('User has been login!');
+        return checkPassword(req.body.password, data.rows[0].password);
+    }).then(bool => {
+        if (bool) {
+            db.alreadySigned(userId).then(result => {
+                if (result.rows.length >= 1) {
+                    req.session = {
+                        userId,
+                        name,
+                        id: result.rows[0].id
+                    };
+                    log("userId,name",userId,name);
+                    res.redirect('/thanks');
+                } else {
+                    req.session = {
+                        userId,
+                        name
+                    };
+                    log("else userId,name",userId,name);
+                    res.redirect('/petition');
+                }
+            });
+        } else {
             res.render('login', {
-                layout: 'main',
-                error: true
+                errorMessage: "Please check your password.You entered a wrong password.",
+                layout: 'main'
+            });
+        }
+    })
+        .catch(err => {
+            console.log(err.message);
+            res.render('login', {
+                errorMessage: "This email address is not existing please register yourself.",
+                layout: 'main'
             });
         });
 });

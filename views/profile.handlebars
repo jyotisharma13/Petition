@@ -1,0 +1,19 @@
+<h3> Petition </h3>
+<img src ="smoke.jpg" width= "200px" height = "100px">
+<h4> Now please tell us just a little bit more about yourself.</h4>
+{{#if error}}
+<div class name="error">SORRY! It seems like you did not enter your first and last name. Please let us know who you are.</div>
+{{/if}}
+<form method="post">
+<div> AGE
+<input name="age" placeholder="Age">
+</div>
+<div> City
+<input name="city" placeholder="City">
+</div>
+<div> Homepage
+<input name="Homepage" placeholder="Homepage">
+</div>
+<button> Continue </button>
+<input name ="_csrf" type="hidden" value="{{csrfToken}}">
+</form>

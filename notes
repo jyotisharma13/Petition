@@ -1,0 +1,25 @@
+Part1
+
+## Routes
+
+1. GET /petition
+    * renders petition template
+2. POST /petition
+    * renders petition template if there is an error
+    * redirects to thanks page if insert was successful after setting a cookie
+3. GET /thanks
+    * renders thanks template
+4. GET /signers
+    * gets the first and last names of the signers from db and passes them to the signers template
+
+## Queries
+1. INSERT into signatures
+2. SELECT the names of the signers
+
+## Templates
+1. petition
+2. thanks
+3. signers
+4. potentially a layout
+5. any partials you want
+steps for 5:--
