@@ -24,19 +24,23 @@ app.use(cookieSession({
     secret: `I'm always angery.`,
     maxAge: 1000 * 60 * 60 * 24 * 14
 }));
-app.use(csurf());// after body parser nd body token
-app.use((req, res, next)=>{
-    res.locals.csrfToken = req.csrfToken();
-    // res.locals.crsf= req.session.first;
-    res.setHeader('X-Frame-Options','DENY');
-    next();
-});
-app.use(function(req, res, next){
-    if(!req.session.userId && req.url !='/register' && req.url != '/login'){
+// user that are logged out try to type other url then registration or login are redirected to registration
+app.use(function(req, res, next) {
+    if (
+        !req.session.userId &&
+        req.url != '/register' &&
+        req.url != '/login'
+    ) {
         res.redirect('/register');
-    } else{
+    } else {
         next();
     }
+});
+app.use(csurf());//use after body parser nd body token
+app.use((req, res, next)=>{
+    res.locals.csrfToken = req.csrfToken();
+    res.setHeader('X-Frame-Options','DENY');
+    next();
 });
 //routes handler
 app.get('/', (req, res) => {
@@ -48,63 +52,56 @@ app.get('/', (req, res) => {
         });
     }
 });
+// login get method
 app.get('/login',requireLoggedOutUser, (req, res)=>{
     res.render('login', {
         layout: 'main'
     });
 });
+//Login post method
+app.post('/login', (req, res) => {
+    console.log('req.body: ', req.body);
+    let userId = '';
+    let first = '';
+    let last = '';
+    db.getUserByEmail(req.body.email).then(data => {
+        log('data body:', data);
 
-app.post('/login', requireLoggedOutUser,(req, res)=>{
-    console.log('req.body:', req.body);
-    let userId ='';
-    let name= '';
-    db.getLoginUser(
-        req.body.email
-    ).then(data => {
-        console.log('Data: ', data);
-        userId = data.rows[0].id;
-        log("userId:",userId);
-        name = `${data.rows[0]['first_name']} ${data.rows[0]['last_name']}`;
-        log("name:",name);
-        // return checkPassword(req.body.password, data.rows[0].password)
-        // console.log('User has been login!');
-        return checkPassword(req.body.password, data.rows[0].password);
-    }).then(bool => {
-        if (bool) {
-            db.alreadySigned(userId).then(result => {
-                if (result.rows.length >= 1) {
-                    req.session = {
-                        userId,
-                        name,
-                        id: result.rows[0].id
-                    };
-                    log("userId,name",userId,name);
-                    res.redirect('/thanks');
-                } else {
-                    req.session = {
-                        userId,
-                        name
-                    };
-                    log("else userId,name",userId,name);
-                    res.redirect('/petition');
-                }
+        return bcrypt
+            .comparePassword(req.body.password, data.rows[0].password)
+            .then(
+                bool => {
+                    if (bool) {
+                        req.session.userId = data.rows[0].id;
+                        req.session.first = data.rows[0].first;
+                        req.session.last = data.rows[0].last;
+                        db.alreadySigned(req.session.userId).then(data => {
+                            console.log('Data from alreadySigned: ', data);
+                            if (data.rows.length >= 1) {
+                                req.session.sigid = data.rows[0].id;
+                                res.redirect('/thanks');
+                            } else {
+                                res.redirect('/petition');
+                            }
+                        }); //closes alreadySigned
+                    } else {
+                        req.session = null;
+                        res.render('/login', {
+                            layout: 'main',
+                            error: true
+                        });
+                    }
+                } // closes bool
+            )
+            .catch(error => {
+                console.log('erroorrrrrrrrrrrrrrrrrrrr in login', error);
+                res.render('login', {
+                    errorMessage: "This email address is not existing please register yourself.",
+                    layout: 'main'
+                });
             });
-        } else {
-            res.render('login', {
-                errorMessage: "Please check your password.You entered a wrong password.",
-                layout: 'main'
-            });
-        }
-    })
-        .catch(err => {
-            console.log(err.message);
-            res.render('login', {
-                errorMessage: "This email address is not existing please register yourself.",
-                layout: 'main'
-            });
-        });
+    }); //closes getUserByEMail
 });
-
 app.get('/register',(req, res)=>{
     res.render('register', {
         layout: 'main'
@@ -129,7 +126,8 @@ app.post('/register',(req, res)=>{
             req.session.first = data.rows[0].first;
             req.session.last = data.rows[0].last;
             console.log('User has been registered!');
-            res.redirect('/petition');
+            // res.redirect('/petition');
+            res.redirect('/userProfile');
         })
         .catch(err => {
             console.log(err);
@@ -153,14 +151,14 @@ app.get('/petition', requireNoSignature, (req, res) => {
 });
 
 app.post('/petition', requireNoSignature, (req, res)=>{
-    log("1st:",req.body.first);
-    log("2nd:",req.body.last);
+    // log("1st:",req.body.first);
+    // log("2nd:",req.body.last);
     log("req.body",req.body);
-    const firstName = req.session.first;
-    const lastName = req.session.last;
+    // const firstName = req.session.first;
+    // const lastName = req.session.last;
     const signature = req.body.sign;
     const userId = req.session.userId;
-    db.addUser(firstName, lastName, signature, userId)
+    db.addUser(signature, userId)       //firstName, lastName,
         .then(data => {
             console.log('Signer has been saved to DB');
             req.session.sigid = data.rows[0].id;
@@ -223,15 +221,46 @@ app.get('/thanks', requireSignature, function(req, res){
 
     }).catch(err => log('err in thanks', err));
 });
+app.get('/userProfile', (req, res) => {
+    res.render('userProfile', {
+        layout: 'main',
+        pageTitle: 'Profile',
+        firstName: req.session.first
+    });
+});
+app.post('/userProfile', (req, res) => {
+    console.log('req.Body of Profile: ', req.body);
+    db.addProfile(
+        req.body.age,
+        req.body.city,
+        req.body.url,
+        req.session.userId
+    ).then(data => {
+        console.log('data aus addProfile:', data);
+        res.redirect('/petition');
+    });
+});
 
+app.post('/editProfile',(req, res) =>{
+    // res.render('');
+    res.redirect('signers');
+});
+app.get('/editProfile', (req, res)=>{
+    res.render('editProfile',{
+        layout:"main"
+    });
+});
+//
 app.get('/petition', function(req, res){
     res.render('petition', {
         layout:"main",
     });
 });
+
+// for logout from petition page
 app.get('/logout', (req, res) => {
     req.session = null;
     res.redirect('/petition');
 });
-
-app.listen(8080, ()=> ca.rainbow("I am listening port 8080!!"));
+app.listen(8080, () => ca.rainbow("I am listening port 8080!!"));
+// app.listen(process.env.PORT || 8080, () => ca.rainbow("I am listening port 8080!!"));

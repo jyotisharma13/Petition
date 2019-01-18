@@ -7,16 +7,16 @@
 
 <img src ="smoke.jpg" width= "200px" height = "100px">
 {{#if error}}
-<div class name="error">SORRY! It seems like you did not enter your first and last name. Please let us know who you are.</div>
+<div class name="error">SORRY! It seems like you did not sign the petition.</div>
 {{/if}}
 <form method="POST">
 
-            <div> First Name
+            <!-- <div> First Name
             <input name = "first" placeholder="FirstName">
         </div>
         <div> Last Name
         <input name = "last" placeholder="LastName"autocomplete="off" autofocus>
-        </div>
+        </div> -->
         <input id="sig-field" type = "hidden" name ="sign" autocomplete="off">
         <input name ="_csrf" type="hidden" value="{{csrfToken}}">
         <!-- // it return the token -->

@@ -22,4 +22,35 @@ Part1
 3. signers
 4. potentially a layout
 5. any partials you want
+....................................................
 steps for 5:--
+
+1. GET route
+   - you'll need a form tag with input fields and a button
+     - you'll need 8 input fields -- first, last, email, password, age, city, url, and hidden csrf input field
+   - to need get the data we'll need to pre-populate the input fields we'll need to write a JOIN query to join users and user_profiles
+2. POST request -- what to do when the user clicks the "update" button?
+   - IF user enters a new password
+     - we'll need to run 2 queries:
+       1. first query should update users. It should update 4 columns -- first, last, email, password
+       2. second query should update user_profiles. -- UPSERT query
+   - IF user doesn't enter a new password
+     - we still need 2 queries
+       1. first query will update users. It will update 3 columns -- first, last, email
+       2. second query should be UPSERT
+   - POST route should be set up as follows:
+   -     app.post('/edit', (req, res) => {
+
+             if (did user enter a new password?) {
+                 Promise.all().then(() => {})
+             } else {
+                 Promise.all().then(() => {})
+             }
+
+         })
+   - Once both tables have been updated and everything looks good, redirect the user to whatever page you think makes sense (like /petition, /thankyou, etc.)
+3. Allow users to delete their signature
+   - on /thankyou page, you need a form tag with a button inside of it that makes a POST request ot the server when clicked
+     - you can do some CSS to make the button look like a link, but it should be a button
+   - in server -- DELETE signature from signatures table
+   - After deleting the signature -- redirect to /petition page 

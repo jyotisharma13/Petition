@@ -1,7 +1,9 @@
-{{#if error}}
-<div class name="error">SORRY! It seems your email address or Password is wrong.Please check your login details.</div>
-{{/if}}
-
+<!-- {{#if errorMessage}}
+<br>
+ <!-<div class name="error">SORRY! It seems your email address or Password is wrong.Please check your login details.</div> -->
+<!-- {{/if}}  -->
+<br>
+{{errorMessage}}
 <img src ="smoke.jpg" width= "200px" height = "100px">
 <h3> Please Login.</h3>
 <form class="form" method="POST">
@@ -9,8 +11,8 @@
 <input name="email" placeholder="Email Address">
 </div>
 <div> Password
-    <input name="Password" type="password" placeholder="Password">
+    <input name="password" type="password" placeholder="Password"autocomplete="off">
 </div>
+<input type="hidden" name="_csrf" value="{{csrfToken}}">
 <button> Login </button>
- <input type="hidden" name="_csrf" value="{{csrfToken}}">
 </form>
