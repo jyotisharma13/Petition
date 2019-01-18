@@ -4,6 +4,7 @@ const ca = require('chalk-animation');
 var cookieSession = require('cookie-session');
 const cookieParser = require('cookie-parser');
 const app = express();
+const {checkProfile} = require('./utils');      // validateForm
 const bcrypt = require('./bcrypt.js');
 // const {cookieSecret} = require('./secrets');
 const csurf = require('csurf');
@@ -16,7 +17,7 @@ app.engine('handlebars', petition());
 app.set('view engine', 'handlebars');
 app.use(bodyParser.urlencoded({extended:false}));
 app.use(express.static(__dirname + "/public"));
-const {requireSignature, requireNoSignature, requireLoggedOutUser} = require('./middleware.js');
+const {requireSignature, requireNoSignature, requireLoggedOutUser, isRegistered} = require('./middleware.js');
 app.disable('x-powered-by');
 //middleware
 app.use(cookieParser());
@@ -61,12 +62,11 @@ app.get('/login',requireLoggedOutUser, (req, res)=>{
 //Login post method
 app.post('/login', (req, res) => {
     console.log('req.body: ', req.body);
-    let userId = '';
-    let first = '';
-    let last = '';
+    // let userId = '';
+    // let first = '';
+    // let last = '';
     db.getUserByEmail(req.body.email).then(data => {
         log('data body:', data);
-
         return bcrypt
             .comparePassword(req.body.password, data.rows[0].password)
             .then(
@@ -181,27 +181,33 @@ app.post('/petition', requireNoSignature, (req, res)=>{
         });
 });
 
-app.get('/signers', requireSignature, function(req, res){
-    db.getSigners().then((signers)=>{
-        log(signers.rows);
-        res.render('signers', {
-            layout:"main",
-            signers:signers.rows
-        });
-    })
-        .catch(err => log('Error in signers:', err));
+app.get('/signers', (req, res) => {
+    db.getSigners()
+        .then(data => {
+            console.log('signers data rows: ', data.rows);
+            res.render('signers', {
+                numOfSigners: data.rows.length - 1,
+                signers: data.rows,
+                layout: 'main'
+            });
+        })
+        .catch(err => console.log('Error in signers:', err));
 });
-// app.get('/signers/:city', requireSignature, function(req, res){
-//      const city = req.params.city;
-//     db.getSigners().then((signers)=>{
-//         log(signers.rows);
-//         res.render('signers', {
-//             layout:"main",
-//             signers:signers.rows
-//         });
-//     })
-//         .catch(err => log('Error in signers:', err));
-// });
+
+
+
+app.get('/signers/:city',requireSignature , (req, res) => {
+    db.getSignersFromCity(req.params.city)
+        .then((data)=> {
+            res.render('signers', {
+                location: req.params.city,
+                name: req.session.name,
+                signers: data.rows,
+                layout: 'main'
+            });
+        }).catch(err => log('Error in signers city:', err));
+});
+
 
 app.get('/thanks', requireSignature, function(req, res){
     log('testing 2');
@@ -221,10 +227,22 @@ app.get('/thanks', requireSignature, function(req, res){
 
     }).catch(err => log('err in thanks', err));
 });
+app.post('/thanks', (req, res)=>{
+    db.deleteSigner(req.session.userId).then(()=>{
+        req.session.sigid = null;
+    }).then(()=>{
+        log('deleted signatures');
+        res.redirect('/petition');
+
+    }).catch(err =>{
+        log('Delete signature',err);
+    });
+});
+
+
 app.get('/userProfile', (req, res) => {
     res.render('userProfile', {
         layout: 'main',
-        pageTitle: 'Profile',
         firstName: req.session.first
     });
 });
@@ -234,22 +252,85 @@ app.post('/userProfile', (req, res) => {
         req.body.age,
         req.body.city,
         req.body.url,
+        // req.session.age,
+        // req.session.city,
+        // req.session.url,
         req.session.userId
     ).then(data => {
-        console.log('data aus addProfile:', data);
+        console.log('data as addProfile:', data);
         res.redirect('/petition');
+    }).catch(error=>log("user profile error:",error));
+});
+app.get('/editProfile',(req, res) =>{
+    db.getSignersProfilesToEdit(req.session.userID)
+        .then(profile => {
+            res.render('edit', {
+                firstName: profile.rows[0]['first'],
+                lastName: profile.rows[0]['last'],
+                email: profile.rows[0].email,
+                age: profile.rows[0].age,
+                city: profile.rows[0].city,
+                url: profile.rows[0].url,
+                layout: 'main'
+            });
+        })
+        .catch(err => {
+            console.log(err.message);
+            res.redirect('back');
+        });
+    // res.redirect('signers');
+});
+// app.get('/editProfile', (req, res)=>{
+    // res.render('editProfile',{
+    //     layout:"main"
+    // });
+    app.post('/editProfile', isRegistered, (req, res) => {
+        bcrypt
+            .hash(req.body.password)
+            .then(hashedPass => {
+        let profile = checkProfile(req.body.age, req.body.city, req.body.url);
+        if (req.body.password) {
+            bcrypt
+                .hash(req.body.password)
+                .then(hashedPass => {
+                    return Promise.all([db.updateUserAndPassword(req.session.userID, req.body.firstName, req.body.lastName, req.body.email, hash),
+                        db.upsertUserProfile(profile.age, profile.city, profile.url, req.session.userID)]);
+                })
+                .then(() => {
+                    req.session.name = `${req.body.firstName} ${req.body.lastName}`
+                    console.log('message', 'Your profile has been edited');
+                    if (req.session.id) {
+                        res.redirect('/thanks');
+                        return;
+                    } else {
+                        res.redirect('/petition');
+                        return;
+                    }
+                })
+                .catch(err => {
+                    console.log(err.message);
+                    res.redirect('/edit');
+                });
+        } else {
+            Promise.all([db.updateUser(req.session.userID, req.body.firstName, req.body.lastName, req.body.email),
+                db.upsertUserProfile(profile.age, profile.city, profile.url, req.session.userID)])
+                .then(() => {
+                    req.session.name = `${req.body.firstName} ${req.body.lastName}`
+                    if (req.session.id) {
+                        res.redirect('/thanks');
+                        return
+                    } else {
+                        res.redirect('/petition');
+                        return
+                    }
+                })
+                .catch(err => {
+                    console.log(err.message);
+                    res.redirect('/edit');
+                });
+        }
     });
-});
-
-app.post('/editProfile',(req, res) =>{
-    // res.render('');
-    res.redirect('signers');
-});
-app.get('/editProfile', (req, res)=>{
-    res.render('editProfile',{
-        layout:"main"
-    });
-});
+// });
 //
 app.get('/petition', function(req, res){
     res.render('petition', {

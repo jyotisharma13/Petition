@@ -1,14 +1,28 @@
 
-
-
 <p>All of these people supported our cause !</p>
 <h3> Here is the signer list:</h3>
-<ul>
+<!-- <ul>
 {{#each signers }}
 
     <li> {{first}} {{last}} </li>
 
 {{/each}}
-</ul>
+</ul> -->
 <a class="logout" href="/logout">Logout</a>
- 
+
+<ul class="signers-ul">
+       {{#signers}}
+       <li>
+           {{#if url}}
+           <a href="{{ url }}">{{ first }} {{last}}</a>
+           {{else}}
+           {{ first }} {{ last }} ,
+           {{/if}}
+           {{age}} years,
+           {{#city}}
+           <a href="signers/{{.}}">{{.}} </a>
+           {{/city}}
+       </li>
+       {{/signers}}
+   </ul>
+<a class="go-back" href="/thanks">Go Back</a>

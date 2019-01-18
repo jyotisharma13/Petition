@@ -24,7 +24,7 @@ canvas.addEventListener('mousemove', function(e) {
     }
 });
 
-canvas.addEventListener('mouseup', function(e) {
+canvas.addEventListener('mouseup', function() {
     draw = false;
     drawData = canvas.toDataURL();
     canvasInput.value = drawData;

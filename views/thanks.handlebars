@@ -9,6 +9,9 @@
 <br>
 <a href="/editProfile"> Edit your profile.</a>
 <br>
-<a href="/delete">Delete your Signature</a>
+<form method="post" action="thanks">
+<button>Delete your Signature</button>
+<input name ="_csrf" type="hidden" value="{{csrfToken}}">
+</form>
 <br>
  <a class="logout" href="/logout">Logout</a>

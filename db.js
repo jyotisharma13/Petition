@@ -1,6 +1,6 @@
 
 const spicedPg = require('spiced-pg');
-const {dbUser, dbPass} = require('./secrets');
+// const {dbUser, dbPass} = require('./secrets');
 // const db = spicedPg(
 // `postgres:${dbUser}:${dbPass}@localhost:5432/petition`
 // );
@@ -8,12 +8,12 @@ const {dbUser, dbPass} = require('./secrets');
 let db;
 // if "if"block runs, that means our website should talk to heroku's postgres database.
 if(process.env.DATABASE_URL){
-db =spicedPg(process.env.DATABASE_URL);
+    db =spicedPg(process.env.DATABASE_URL);
 }else {
     // only do this if you have a secrets.json file
-    var secrets= require('./secrets.json');
+    var secrets = require('./secrets.json');
     const {dbUser, dbPass} = require('./secrets');
-db = spicedPg(`postgres:${dbUser}:${dbPass}@localhost:5432/petition`);
+    db = spicedPg(`postgres:${dbUser}:${dbPass}@localhost:5432/petition`);
 }
 module.exports.addUser = function(sign, user_id) {
     return db.query(
@@ -21,9 +21,16 @@ module.exports.addUser = function(sign, user_id) {
         [sign, user_id]
     );
 };
-// get sign from the signature table
-module.exports.getSigners = function() {
-    return db.query(`SELECT sign FROM signatures`);
+//Get Signers
+module.exports.getSigners = () => {
+    return db.query(
+        `SELECT
+        users.first AS first, users.last AS last, user_profiles.age AS age, user_profiles.city as city, user_profiles.url AS url FROM signatures
+        LEFT JOIN users
+        ON signatures.user_id = users.id
+        LEFT JOIN user_profiles
+        ON signatures.user_id = user_profiles.user_id`
+    );
 };
 //get user signature(get signer)
 module.exports.getSignature = function(user_id) {
@@ -41,25 +48,6 @@ module.exports.alreadySigned = (id) => {
     return db.query(`
         SELECT id FROM signatures WHERE user_id = $1
     `,[id]);
-};
-// // GET ALL SIGNERS
-// module.exports.getAllSigners = () => {
-//     return db.query(`
-//         SELECT first, last FROM users
-//         INNER JOIN signatures
-//         ON users.id = signatures.user_id
-//     `);
-// };
-///get all signers using get user and check signer
-module.exports.getUserAndCheckSigner = (email) => {
-    return db.query(`
-        SELECT users.first, users.last, users.id, users.password, signatures.id AS sign_id
-        FROM users
-        LEFT JOIN signatures
-        ON users.id = signatures.user_id
-        WHERE email= $1`,
-    [email]
-    );
 };
 
 // get signature count
@@ -94,8 +82,6 @@ module.exports.getSignersProfiles = () => {
         ON users.id = signatures.user_id
     `);
 };
-
-
 // GET ALL SIGNERS FROM CITY
 module.exports.getSignersFromCity = (city) => {
     return db.query(`
@@ -110,10 +96,68 @@ module.exports.getSignersFromCity = (city) => {
     );
 };
 // for deleting signature
-module.exports.deleteSigner = (id) => {
+module.exports.deleteSigner = (user_id) => {
     return db.query(`
         DELETE FROM signatures
+        WHERE user_id = $1`,
+    [user_id]
+    );
+};
+
+// GET ALL SIGNERS
+module.exports.getUserAndCheckSigner = (email) => {
+    return db.query(`
+        SELECT users.first, users.last, users.id, users.password, signatures.id AS sign_id
+        FROM users
+        LEFT JOIN signatures
+        ON users.id = signatures.user_id
+        WHERE email= $1`,
+    [email]
+    );
+};
+// GET USER TO EDIT PROFILE
+module.exports.getSignersProfilesToEdit = (id) => {
+    return db.query(`
+        SELECT first, email, last, age, city, url
+        FROM users
+        LEFT JOIN user_profiles
+        ON users.id = user_profiles.user_id
+        WHERE users.id = $1`, [id]
+    );
+};
+// UPDATE USER
+module.exports.updateUser = (id, firstName, lastName, email) => {
+    return db.query(`
+        UPDATE users
+        SET first = $2,
+            last = $3,
+            email = $4
         WHERE id = $1`,
-    [id]
+    [id, firstName, lastName, email]
+    );
+};
+// UPDATE USER AND PASSWORD
+module.exports.updateUserAndPassword = (id, firstName, lastName, email, password) => {
+    return db.query(`
+        UPDATE users
+        SET first = $2,
+            last = $3,
+            email = $4,
+            password = $5
+        WHERE id = $1`,
+    [id, firstName, lastName, email, password]
+    );
+};
+// UPSERT USER PROFILE
+module.exports.upsertUserProfile = (age, city, url, userID) => {
+    return db.query(`
+        INSERT INTO user_profiles (age, city, url, user_id)
+        VALUES ($1, $2, $3, $4)
+        ON CONFLICT (user_id)
+        DO UPDATE
+        SET age = $1,
+            city = $2,
+            url = $3`,
+    [age, city, url, userID]
     );
 };
