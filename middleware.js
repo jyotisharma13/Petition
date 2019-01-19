@@ -25,15 +25,18 @@ const requireNoSignature = (req, res, next)=>{
         next();
     }
 };
-module.exports.isRegistered = (req, res, next) => {
+const isRegistered =(req, res, next)=>{
     if(!req.session.userID) {
         res.redirect('/register');
     } else {
         next();
     }
 };
+
 module.exports = {
     requireSignature,
     requireNoSignature,
-    requireLoggedOutUser
+    requireLoggedOutUser,
+    isRegistered
+
 };

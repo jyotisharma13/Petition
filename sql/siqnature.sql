@@ -2,8 +2,8 @@ drop table if exists signatures;
 
 create table signatures (
     id serial primary key,
-    sign text not null,
-     user_id integer references users(id) not null,
+    sign text NOT NULL CHECK (sign <> ''),
+     user_id integer UNIQUE NOT NULL references users(id),
     created_at timestamp default current_timestamp
 );
 -- first varchar(200)not null check (first <> ''),

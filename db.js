@@ -74,7 +74,7 @@ module.exports.addProfile = (age, city, url, userID) => {
 // GET ALL SIGNERS AND PROFILES
 module.exports.getSignersProfiles = () => {
     return db.query(`
-        SELECT first_name, last_name, age, city, url
+        SELECT first, last, age, city, url
         FROM users
         LEFT JOIN user_profiles
         ON users.id = user_profiles.user_id

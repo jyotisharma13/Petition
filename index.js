@@ -17,7 +17,7 @@ app.engine('handlebars', petition());
 app.set('view engine', 'handlebars');
 app.use(bodyParser.urlencoded({extended:false}));
 app.use(express.static(__dirname + "/public"));
-const {requireSignature, requireNoSignature, requireLoggedOutUser, isRegistered} = require('./middleware.js');
+const {requireSignature, requireNoSignature, requireLoggedOutUser,isRegistered } = require('./middleware.js');
 app.disable('x-powered-by');
 //middleware
 app.use(cookieParser());
@@ -53,6 +53,7 @@ app.get('/', (req, res) => {
         });
     }
 });
+
 // login get method
 app.get('/login',requireLoggedOutUser, (req, res)=>{
     res.render('login', {
@@ -203,7 +204,7 @@ app.get('/signers/:city',requireSignature , (req, res) => {
                 location: req.params.city,
                 name: req.session.name,
                 signers: data.rows,
-                layout: 'main'
+                layout: "main"
             });
         }).catch(err => log('Error in signers city:', err));
 });
@@ -262,74 +263,75 @@ app.post('/userProfile', (req, res) => {
     }).catch(error=>log("user profile error:",error));
 });
 app.get('/editProfile',(req, res) =>{
-    db.getSignersProfilesToEdit(req.session.userID)
+    console.log(req.session.userId);
+    db.getSignersProfilesToEdit(req.session.userId)
         .then(profile => {
-            res.render('edit', {
-                firstName: profile.rows[0]['first'],
-                lastName: profile.rows[0]['last'],
+            log("profile",profile);
+            res.render('editProfile', {
+                firstName: profile.rows[0].first,
+                lastName: profile.rows[0].last,
                 email: profile.rows[0].email,
-                age: profile.rows[0].age,
-                city: profile.rows[0].city,
-                url: profile.rows[0].url,
+                age: profile.rows[0].age || null,
+                city: profile.rows[0].city || null,
+                url: profile.rows[0].url || null,
                 layout: 'main'
             });
         })
         .catch(err => {
             console.log(err.message);
-            res.redirect('back');
+            res.redirect('/editProfile');
         });
     // res.redirect('signers');
 });
 // app.get('/editProfile', (req, res)=>{
-    // res.render('editProfile',{
-    //     layout:"main"
-    // });
-    app.post('/editProfile', isRegistered, (req, res) => {
+// res.render('editProfile',{
+//     layout:"main"
+// });
+app.post('/editProfile', isRegistered, (req, res) => {
+    let profile = checkProfile(req.body.age, req.body.city, req.body.url);
+    if (req.body.password) {
         bcrypt
             .hash(req.body.password)
             .then(hashedPass => {
-        let profile = checkProfile(req.body.age, req.body.city, req.body.url);
-        if (req.body.password) {
-            bcrypt
-                .hash(req.body.password)
-                .then(hashedPass => {
-                    return Promise.all([db.updateUserAndPassword(req.session.userID, req.body.firstName, req.body.lastName, req.body.email, hash),
-                        db.upsertUserProfile(profile.age, profile.city, profile.url, req.session.userID)]);
-                })
-                .then(() => {
-                    req.session.name = `${req.body.firstName} ${req.body.lastName}`
-                    console.log('message', 'Your profile has been edited');
-                    if (req.session.id) {
-                        res.redirect('/thanks');
-                        return;
-                    } else {
-                        res.redirect('/petition');
-                        return;
-                    }
-                })
-                .catch(err => {
-                    console.log(err.message);
-                    res.redirect('/edit');
-                });
-        } else {
-            Promise.all([db.updateUser(req.session.userID, req.body.firstName, req.body.lastName, req.body.email),
-                db.upsertUserProfile(profile.age, profile.city, profile.url, req.session.userID)])
-                .then(() => {
-                    req.session.name = `${req.body.firstName} ${req.body.lastName}`
-                    if (req.session.id) {
-                        res.redirect('/thanks');
-                        return
-                    } else {
-                        res.redirect('/petition');
-                        return
-                    }
-                })
-                .catch(err => {
-                    console.log(err.message);
-                    res.redirect('/edit');
-                });
-        }
-    });
+                return Promise.all([db.updateUserAndPassword(req.session.userId, req.body.first, req.body.last, req.body.email, hashedPass),
+                    db.upsertUserProfile(profile.age, profile.city, profile.url, req.session.userId)]);
+            })//then closes
+            .then(() => {
+                req.session.first = req.body.first;
+                req.session.last = req.body.last;
+                console.log('message', 'Your profile has been edited');
+                if (req.session.userId) {
+                    res.redirect('/thanks');
+                    // return;
+                } else {
+                    res.redirect('/petition');
+                    // return;
+                }//else closes
+            })//. then again closes
+            .catch(err => {
+                console.log(err.message);
+                res.redirect('/editProfile');
+            });//catch closes
+    } else {
+        Promise.all([db.updateUser(req.session.userId, req.body.first, req.body.last, req.body.email),
+            db.upsertUserProfile(profile.age, profile.city, profile.url, req.session.userId)])
+            .then(() => {
+                req.session.first = req.body.first;
+                req.session.last = req.body.last;
+                if (req.session.userId) {
+                    res.redirect('/thanks');
+                    // return
+                } else {
+                    res.redirect('/petition');
+                    // return
+                }// if else closes
+            })//then closes
+            .catch(err => {
+                console.log(err.message);
+                res.redirect('/editProfile');
+            });// catch closes
+    }//if else closes
+});// post method closes
 // });
 //
 app.get('/petition', function(req, res){

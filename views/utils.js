@@ -8,8 +8,8 @@
 const checkProfile = (age, city, url) => {
     let userProfile = {};
     if (url !== '' && !(url.startsWith('http://') || url.startsWith('https://') || url.startsWith('//'))) {
-        let adress = 'http://';
-        userProfile.url = adress.concat(url);
+        let address = 'http://';
+        userProfile.url = address.concat(url);
     } else if (url !== '') {
         userProfile.url = url;
     }
@@ -58,4 +58,3 @@ const checkProfile = (age, city, url) => {
 //     return;
 // };
 module.exports = { checkProfile };
-// module.exports = { PasswordValidator, checkProfile, validateForm }
